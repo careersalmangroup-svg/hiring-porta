@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline Hiring Portal (Enhanced)</title>
+    <!-- Tailwind CSS CDN for quick styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Dexie.js CDN for IndexedDB simplification -->
+    <script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
+    <style>
+        /* Custom styles for Inter font and general layout */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Light blue-gray background */
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Align to top */
+            min-height: 100vh;
+            padding: 2rem;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 1rem; /* Rounded corners */
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 1200px; /* Increased max width for more content */
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+        .section-header {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #334155; /* Slate-700 */
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+        .form-section, .list-section {
+            padding: 1.5rem;
+            border: 1px solid #e2e8f0; /* Light gray border */
+            border-radius: 0.75rem;
+            background-color: #fdfefe;
+        }
+        .input-field, .select-field, .textarea-field {
+            padding: 0.75rem 1rem;
+            border: 1px solid #cbd5e0;
+            border-radius: 0.5rem;
+            width: 100%;
+            transition: border-color 0.2s;
+        }
+        .input-field:focus, .select-field:focus, .textarea-field:focus {
+            outline: none;
+            border-color: #3b82f6; /* Blue focus ring */
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+        }
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        .btn-primary {
+            background-color: #3b82f6; /* Blue */
+            color: #ffffff;
+            border: none;
+        }
+        .btn-primary:hover {
+            background-color: #2563eb; /* Darker blue */
+            transform: translateY(-1px);
+        }
+        .btn-primary:active {
+            background-color: #1d4ed8;
+            transform: translateY(0);
+        }
+        .btn-delete {
+            background-color: #ef4444; /* Red */
+            color: #ffffff;
+            border: none;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+        }
+        .btn-delete:hover {
+            background-color: #dc2626; /* Darker red */
+        }
+        .btn-edit {
+            background-color: #f97316; /* Orange */
+            color: #ffffff;
+            border: none;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            margin-right: 0.5rem;
+        }
+        .btn-edit:hover {
+            background-color: #ea580c; /* Darker orange */
+        }
+        .btn-secondary {
+            background-color: #64748b; /* Slate-500 */
+            color: #ffffff;
+            border: none;
+        }
+        .btn-secondary:hover {
+            background-color: #475569; /* Slate-700 */
+        }
+        .btn-info {
+            background-color: #0ea5e9; /* Sky-500 */
+            color: #ffffff;
+            border: none;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            margin-right: 0.5rem;
+        }
+        .btn-info:hover {
+            background-color: #0284c7; /* Sky-700 */
+        }
+        .item-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #edf2f7;
+        }
+        .item-row:last-child {
+            border-bottom: none;
+        }
+        .empty-state {
+            text-align: center;
+            color: #64748b;
+            padding: 2rem;
+            font-style: italic;
+        }
+        .tabs {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .tab-button {
+            padding: 0.75rem 1.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            border-top-left-radius: 0.5rem;
+            border-top-right-radius: 0.5rem;
+            border: 1px solid transparent;
+            border-bottom: none;
+            color: #64748b; /* Slate-500 */
+            transition: all 0.2s;
+        }
+        .tab-button.active {
+            background-color: #ffffff;
+            border-color: #e2e8f0;
+            border-bottom-color: #ffffff;
+            color: #3b82f6; /* Blue-500 */
+        }
+        .tab-button:hover:not(.active) {
+            background-color: #f8fafc; /* Slate-50 */
+            color: #334155; /* Slate-700 */
+        }
+
+        /* Modal Styles */
+        .modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            width: 90%;
+            max-width: 700px;
+            position: relative;
+        }
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            position: absolute;
+            top: 1rem;
+            right: 1.5rem;
+            cursor: pointer;
+        }
+        .close-button:hover,
+        .close-button:focus {
+            color: #000;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .container {
+                padding: 1.5rem;
+            }
+            body {
+                padding: 1rem;
+            }
+            .item-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+            .item-row .flex {
+                width: 100%;
+                justify-content: space-between;
+            }
+            .tab-button {
+                padding: 0.5rem 1rem;
+                font-size: 0.875rem;
+            }
+            .modal-content {
+                padding: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-4xl font-extrabold text-center text-gray-800 mb-6">Complete Hiring Portal</h1>
+
+        <div class="flex justify-end mb-4">
+            <button id="downloadAllDataBtn" class="btn btn-secondary">Download All Data (CSV)</button>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-button active" data-tab="jobs">Jobs</button>
+            <button class="tab-button" data-tab="candidates">Candidates</button>
+            <button class="tab-button" data-tab="applications">Applications</button>
+        </div>
+
+        <!-- Jobs Tab Content -->
+        <div id="jobs-tab" class="tab-content">
+            <h2 class="section-header">Job Vacancies</h2>
+
+            <!-- Add/Edit Job Section -->
+            <div class="form-section mb-8">
+                <h3 class="text-xl font-bold text-gray-700 mb-4" id="jobFormTitle">Add New Job Vacancy</h3>
+                <form id="jobForm" class="space-y-4">
+                    <input type="hidden" id="jobId" name="jobId">
+                    <div>
+                        <label for="jobTitle" class="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
+                        <input type="text" id="jobTitle" name="jobTitle" class="input-field" placeholder="Software Engineer" required>
+                    </div>
+                    <div>
+                        <label for="jobDepartment" class="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                        <input type="text" id="jobDepartment" name="jobDepartment" class="input-field" placeholder="Engineering">
+                    </div>
+                    <div>
+                        <label for="jobDescription" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <textarea id="jobDescription" name="jobDescription" rows="3" class="textarea-field" placeholder="Detailed responsibilities and duties..."></textarea>
+                    </div>
+                    <div>
+                        <label for="jobRequirements" class="block text-sm font-medium text-gray-700 mb-1">Requirements</label>
+                        <textarea id="jobRequirements" name="jobRequirements" rows="3" class="textarea-field" placeholder="Required skills and qualifications..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-full" id="jobSubmitBtn">Add Job</button>
+                </form>
+            </div>
+
+            <!-- Job List Section -->
+            <div class="list-section">
+                <h3 class="text-xl font-bold text-gray-700 mb-4">Current Job Openings</h3>
+                <div id="jobList" class="divide-y divide-gray-200">
+                    <p class="empty-state" id="emptyJobsState">No job vacancies yet. Add one above!</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Candidates Tab Content -->
+        <div id="candidates-tab" class="tab-content hidden">
+            <h2 class="section-header">Candidate Management</h2>
+
+            <!-- Add/Edit Candidate Section -->
+            <div class="form-section mb-8">
+                <h3 class="text-xl font-bold text-gray-700 mb-4" id="candidateFormTitle">Add New Candidate</h3>
+                <form id="candidateForm" class="space-y-4">
+                    <input type="hidden" id="candidateId" name="candidateId">
+                    <div>
+                        <label for="candidateName" class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                        <input type="text" id="candidateName" name="candidateName" class="input-field" placeholder="John Doe" required>
+                    </div>
+                    <div>
+                        <label for="candidateEmail" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <input type="email" id="candidateEmail" name="candidateEmail" class="input-field" placeholder="john.doe@example.com" required>
+                    </div>
+                    <div>
+                        <label for="candidatePhone" class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                        <input type="tel" id="candidatePhone" name="candidatePhone" class="input-field" placeholder="+1234567890">
+                    </div>
+                    <div>
+                        <label for="candidateResume" class="block text-sm font-medium text-gray-700 mb-1">Resume (PDF, DOCX)</label>
+                        <input type="file" id="candidateResume" name="candidateResume" accept=".pdf,.doc,.docx" class="input-field border-none p-0">
+                        <p class="text-xs text-gray-500 mt-1">Only PDF, DOC, DOCX files are supported.</p>
+                    </div>
+                    <div>
+                        <label for="candidateNotes" class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                        <textarea id="candidateNotes" name="candidateNotes" rows="3" class="textarea-field" placeholder="Strengths, weaknesses, general impressions..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-full" id="candidateSubmitBtn">Add Candidate</button>
+                </form>
+            </div>
+
+            <!-- Candidate List Section -->
+            <div class="list-section">
+                <h3 class="text-xl font-bold text-gray-700 mb-4">All Candidates</h3>
+                <div id="candidateList" class="divide-y divide-gray-200">
+                    <p class="empty-state" id="emptyCandidatesState">No candidates added yet. Add one above!</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Applications Tab Content -->
+        <div id="applications-tab" class="tab-content hidden">
+            <h2 class="section-header">Application Tracking</h2>
+
+            <!-- Create/Edit Application Section -->
+            <div class="form-section mb-8">
+                <h3 class="text-xl font-bold text-gray-700 mb-4" id="applicationFormTitle">Create New Application</h3>
+                <form id="applicationForm" class="space-y-4">
+                    <input type="hidden" id="applicationId" name="applicationId">
+                    <div>
+                        <label for="appCandidate" class="block text-sm font-medium text-gray-700 mb-1">Candidate</label>
+                        <select id="appCandidate" class="select-field" required>
+                            <option value="">Select a Candidate</option>
+                            <!-- Options populated by JS -->
+                        </select>
+                    </div>
+                    <div>
+                        <label for="appJob" class="block text-sm font-medium text-gray-700 mb-1">Job Vacancy</label>
+                        <select id="appJob" class="select-field" required>
+                            <option value="">Select a Job</option>
+                            <!-- Options populated by JS -->
+                        </select>
+                    </div>
+                    <div>
+                        <label for="appStage" class="block text-sm font-medium text-gray-700 mb-1">Current Stage</label>
+                        <select id="appStage" class="select-field" required>
+                            <option value="Applied">Applied</option>
+                            <option value="Screening">Screening</option>
+                            <option value="Interview Scheduled">Interview Scheduled</option>
+                            <option value="Interviewed">Interviewed</option>
+                            <option value="Assessment">Assessment</option>
+                            <option value="Reference Check">Reference Check</option>
+                            <option value="Offer Extended">Offer Extended</option>
+                            <option value="Offer Accepted">Offer Accepted</option>
+                            <option value="Offer Rejected">Offer Rejected</option>
+                            <option value="Background Check">Background Check</option>
+                            <option value="Onboarding">Onboarding</option>
+                            <option value="Hired">Hired</option>
+                            <option value="Rejected">Rejected</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="appNotes" class="block text-sm font-medium text-gray-700 mb-1">Application Notes</label>
+                        <textarea id="appNotes" name="appNotes" rows="3" class="textarea-field" placeholder="Notes specific to this application (e.g., interview feedback, offer details)..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-full" id="applicationSubmitBtn">Create Application</button>
+                </form>
+            </div>
+
+            <!-- Application List Section -->
+            <div class="list-section">
+                <h3 class="text-xl font-bold text-gray-700 mb-4">All Applications</h3>
+                <div id="applicationList" class="divide-y divide-gray-200">
+                    <p class="empty-state" id="emptyApplicationsState">No applications created yet. Create one above!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Offer Letter Modal -->
+    <div id="offerLetterModal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-button" id="closeOfferLetterModal">&times;</span>
+            <h2 class="text-2xl font-bold text-gray-700 mb-4">Generate Offer Letter</h2>
+            <form id="offerLetterForm" class="space-y-4">
+                <input type="hidden" id="offerAppId">
+                <div>
+                    <label for="offerCompanyName" class="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+                    <input type="text" id="offerCompanyName" class="input-field" placeholder="SALMAN GROUP" required>
+                </div>
+                <div>
+                    <label for="offerCandidateName" class="block text-sm font-medium text-gray-700 mb-1">Candidate Name</label>
+                    <input type="text" id="offerCandidateName" class="input-field" readonly>
+                </div>
+                <div>
+                    <label for="offerJobTitle" class="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
+                    <input type="text" id="offerJobTitle" class="input-field" readonly>
+                </div>
+                <div>
+                    <label for="offerReportingManager" class="block text-sm font-medium text-gray-700 mb-1">Reporting Manager</label>
+                    <input type="text" id="offerReportingManager" class="input-field" placeholder="Showroom Manager/Sales Manager">
+                </div>
+                <div>
+                    <label for="offerSalary" class="block text-sm font-medium text-gray-700 mb-1">Annual Salary</label>
+                    <input type="number" id="offerSalary" class="input-field" placeholder="e.g., 75000" required>
+                </div>
+                <div>
+                    <label for="offerPayrollSchedule" class="block text-sm font-medium text-gray-700 mb-1">Payroll Schedule</label>
+                    <select id="offerPayrollSchedule" class="select-field">
+                        <option value="monthly basis, less required deductions (Through direct deposit)">Monthly (Direct Deposit)</option>
+                        <option value="monthly basis, less required deductions (by Cheque/Cash)">Monthly (Cheque/Cash)</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="offerBenefits" class="block text-sm font-medium text-gray-700 mb-1">Benefits Details</label>
+                    <textarea id="offerBenefits" rows="3" class="textarea-field" placeholder="e.g., You shall be entitled to participate in all benefit plans of [Your Company Name]."></textarea>
+                </div>
+                <div>
+                    <label for="offerTravelPolicy" class="block text-sm font-medium text-gray-700 mb-1">Travel Policy Details</label>
+                    <textarea id="offerTravelPolicy" rows="3" class="textarea-field" placeholder="e.g., Required to visit Head Office, Other Stores, Banks, etc. as per the company travel policy."></textarea>
+                </div>
+                <div>
+                    <label for="offerProbationPeriod" class="block text-sm font-medium text-gray-700 mb-1">Probationary Period (Months)</label>
+                    <input type="number" id="offerProbationPeriod" class="input-field" placeholder="e.g., 6" min="0">
+                </div>
+                <div>
+                    <label for="offerMinEmploymentPeriod" class="block text-sm font-medium text-gray-700 mb-1">Minimum Employment Period (Months)</label>
+                    <input type="number" id="offerMinEmploymentPeriod" class="input-field" placeholder="e.g., 24" min="0">
+                </div>
+                <div>
+                    <label for="offerResignationNotice" class="block text-sm font-medium text-gray-700 mb-1">Resignation Notice Period (Days)</label>
+                    <input type="number" id="offerResignationNotice" class="input-field" placeholder="e.g., 60" min="0">
+                </div>
+                <div>
+                    <label for="offerTerminationNotice" class="block text-sm font-medium text-gray-700 mb-1">Termination Notice Period (Days)</label>
+                    <input type="number" id="offerTerminationNotice" class="input-field" placeholder="e.g., 30" min="0">
+                </div>
+                <div>
+                    <label for="offerStartDate" class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                    <input type="date" id="offerStartDate" class="input-field" required>
+                </div>
+                <div>
+                    <label for="offerExpiryDate" class="block text-sm font-medium text-gray-700 mb-1">Offer Expiry Date</label>
+                    <input type="date" id="offerExpiryDate" class="input-field" required>
+                </div>
+                <div>
+                    <label for="offerDetails" class="block text-sm font-medium text-gray-700 mb-1">Additional Details (e.g., other terms)</label>
+                    <textarea id="offerDetails" rows="4" class="textarea-field" placeholder="Health insurance, paid time off, etc."></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary w-full">Generate & Download Offer Letter</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // --- IndexedDB Database Setup with Dexie.js ---
+        // Create a new Dexie database instance
+        const db = new Dexie('HiringDB');
+
+        // Define the database schema and versions
+        // '++id' means auto-incrementing primary key
+        // '&email' means unique index on email for candidates
+        db.version(1).stores({
+            jobs: '++id, title, department',
+            candidates: '++id, &email, name', // email is unique, name is indexed
+            applications: '++id, candidate_id, job_id, stage', // candidate_id and job_id are indexed
+        });
+
+        // Open the database (this is asynchronous)
+        db.open().catch(function (e) {
+            console.error("Failed to open Dexie database: " + e.stack || e);
+        });
+
+        // --- DOM Element References ---
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const tabContents = document.querySelectorAll('.tab-content');
+        const downloadAllDataBtn = document.getElementById('downloadAllDataBtn');
+
+        // Job elements
+        const jobForm = document.getElementById('jobForm');
+        const jobIdInput = document.getElementById('jobId');
+        const jobFormTitle = document.getElementById('jobFormTitle');
+        const jobSubmitBtn = document.getElementById('jobSubmitBtn');
+        const jobListDiv = document.getElementById('jobList');
+        const emptyJobsState = document.getElementById('emptyJobsState');
+
+        // Candidate elements
+        const candidateForm = document.getElementById('candidateForm');
+        const candidateIdInput = document.getElementById('candidateId');
+        const candidateFormTitle = document.getElementById('candidateFormTitle');
+        const candidateSubmitBtn = document.getElementById('candidateSubmitBtn');
+        const candidateResumeInput = document.getElementById('candidateResume');
+        const candidateListDiv = document.getElementById('candidateList');
+        const emptyCandidatesState = document.getElementById('emptyCandidatesState');
+
+        // Application elements
+        const applicationForm = document.getElementById('applicationForm');
+        const applicationIdInput = document.getElementById('applicationId');
+        const applicationFormTitle = document.getElementById('applicationFormTitle');
+        const applicationSubmitBtn = document.getElementById('applicationSubmitBtn');
+        const appCandidateSelect = document.getElementById('appCandidate');
+        const appJobSelect = document.getElementById('appJob');
+        const applicationListDiv = document.getElementById('applicationList');
+        const emptyApplicationsState = document.getElementById('emptyApplicationsState');
+
+        // Offer Letter Modal elements
+        const offerLetterModal = document.getElementById('offerLetterModal');
+        const closeOfferLetterModal = document.getElementById('closeOfferLetterModal');
+        const offerLetterForm = document.getElementById('offerLetterForm');
+        const offerAppIdInput = document.getElementById('offerAppId');
+        const offerCompanyNameInput = document.getElementById('offerCompanyName'); // New
+        const offerCandidateNameInput = document.getElementById('offerCandidateName');
+        const offerJobTitleInput = document.getElementById('offerJobTitle');
+        const offerReportingManagerInput = document.getElementById('offerReportingManager'); // New
+        const offerSalaryInput = document.getElementById('offerSalary');
+        const offerPayrollScheduleInput = document.getElementById('offerPayrollSchedule'); // New
+        const offerBenefitsInput = document.getElementById('offerBenefits'); // New
+        const offerTravelPolicyInput = document.getElementById('offerTravelPolicy'); // New
+        const offerProbationPeriodInput = document.getElementById('offerProbationPeriod'); // New
+        const offerMinEmploymentPeriodInput = document.getElementById('offerMinEmploymentPeriod'); // New
+        const offerResignationNoticeInput = document.getElementById('offerResignationNotice'); // New
+        const offerTerminationNoticeInput = document.getElementById('offerTerminationNotice'); // New
+        const offerStartDateInput = document.getElementById('offerStartDate');
+        const offerExpiryDateInput = document.getElementById('offerExpiryDate');
+        const offerDetailsInput = document.getElementById('offerDetails');
+
+
+        // --- Tab Switching Logic ---
+        tabButtons.forEach(button => {
+            button.addEventListener('click', async () => {
+                // Remove active class from all buttons and hide all content
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                tabContents.forEach(content => content.classList.add('hidden'));
+
+                // Add active class to clicked button
+                button.classList.add('active');
+
+                // Show corresponding tab content
+                const targetTabId = button.dataset.tab + '-tab';
+                document.getElementById(targetTabId).classList.remove('hidden');
+
+                // Re-render lists when switching tabs to ensure freshness
+                // Also reset forms to "Add New" mode
+                if (button.dataset.tab === 'jobs') {
+                    await renderJobs();
+                    resetJobForm();
+                } else if (button.dataset.tab === 'candidates') {
+                    await renderCandidates();
+                    resetCandidateForm();
+                } else if (button.dataset.tab === 'applications') {
+                    await renderApplications();
+                    await populateApplicationForms(); // Ensure dropdowns are updated
+                    resetApplicationForm();
+                }
+            });
+        });
+
+        // --- Job Management Functions ---
+
+        /**
+         * Renders the list of jobs from IndexedDB.
+         */
+        async function renderJobs() {
+            try {
+                const jobs = await db.jobs.toArray(); // Get all jobs
+                jobListDiv.innerHTML = ''; // Clear existing list
+
+                if (jobs.length === 0) {
+                    emptyJobsState.style.display = 'block';
+                } else {
+                    emptyJobsState.style.display = 'none';
+                    jobs.forEach(job => {
+                        const jobItem = document.createElement('div');
+                        jobItem.className = 'item-row';
+                        jobItem.innerHTML = `
+                            <div>
+                                <p class="text-lg font-semibold text-gray-800">${job.title}</p>
+                                <p class="text-sm text-gray-600">${job.department ? job.department : 'N/A'}</p>
+                                <p class="text-xs text-gray-500">Created: ${new Date(job.created_at).toLocaleDateString()}</p>
+                            </div>
+                            <div>
+                                <button class="btn btn-edit" data-id="${job.id}" data-type="job-edit">Edit</button>
+                                <button class="btn btn-delete" data-id="${job.id}" data-type="job-delete">Delete</button>
+                            </div>
+                        `;
+                        jobListDiv.appendChild(jobItem);
+                    });
+                }
+            } catch (error) {
+                console.error("Error rendering jobs:", error);
+            }
+        }
+
+        /**
+         * Resets the job form to "Add New" mode.
+         */
+        function resetJobForm() {
+            jobIdInput.value = '';
+            jobForm.reset();
+            jobFormTitle.textContent = 'Add New Job Vacancy';
+            jobSubmitBtn.textContent = 'Add Job';
+        }
+
+        // Add/Edit Job Form Submission
+        jobForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const jobId = jobIdInput.value;
+            const jobData = {
+                title: document.getElementById('jobTitle').value,
+                department: document.getElementById('jobDepartment').value,
+                description: document.getElementById('jobDescription').value,
+                requirements: document.getElementById('jobRequirements').value,
+                status: 'Open', // Default status
+            };
+
+            try {
+                if (jobId) {
+                    // Update existing job
+                    await db.jobs.update(parseInt(jobId), {
+                        ...jobData,
+                        updated_at: new Date().toISOString()
+                    });
+                    console.log("Job updated:", jobId);
+                } else {
+                    // Add new job
+                    await db.jobs.add({
+                        ...jobData,
+                        created_at: new Date().toISOString()
+                    });
+                    console.log("New job added.");
+                }
+                await renderJobs(); // Re-render the list
+                resetJobForm(); // Reset form after submission
+                await populateApplicationForms(); // Update job dropdown in application form
+            } catch (error) {
+                console.error("Error submitting job form:", error);
+            }
+        });
+
+        // --- Candidate Management Functions ---
+
+        /**
+         * Renders the list of candidates from IndexedDB.
+         */
+        async function renderCandidates() {
+            try {
+                const candidates = await db.candidates.toArray(); // Get all candidates
+                candidateListDiv.innerHTML = ''; // Clear existing list
+
+                if (candidates.length === 0) {
+                    emptyCandidatesState.style.display = 'block';
+                } else {
+                    emptyCandidatesState.style.display = 'none';
+                    candidates.forEach(candidate => {
+                        const candidateItem = document.createElement('div');
+                        candidateItem.className = 'item-row';
+                        candidateItem.innerHTML = `
+                            <div>
+                                <p class="text-lg font-semibold text-gray-800">${candidate.name}</p>
+                                <p class="text-sm text-gray-600">${candidate.email}</p>
+                                ${candidate.phone ? `<p class="text-sm text-gray-600">${candidate.phone}</p>` : ''}
+                                ${candidate.resume && candidate.resume.name ?
+                                    `<p class="text-xs text-gray-500 mt-1">Resume: ${candidate.resume.name} (${(candidate.resume.size / 1024).toFixed(2)} KB)</p>` : ''}
+                            </div>
+                            <div class="flex items-center gap-2">
+                                ${candidate.resume && candidate.resume.name ?
+                                    `<button class="btn btn-info" data-id="${candidate.id}" data-type="download-resume">View Resume</button>` : ''}
+                                <button class="btn btn-edit" data-id="${candidate.id}" data-type="candidate-edit">Edit</button>
+                                <button class="btn btn-delete" data-id="${candidate.id}" data-type="candidate-delete">Delete</button>
+                            </div>
+                        `;
+                        candidateListDiv.appendChild(candidateItem);
+                    });
+                }
+            } catch (error) {
+                console.error("Error rendering candidates:", error);
+            }
+        }
+
+        /**
+         * Resets the candidate form to "Add New" mode.
+         */
+        function resetCandidateForm() {
+            candidateIdInput.value = '';
+            candidateForm.reset();
+            candidateFormTitle.textContent = 'Add New Candidate';
+            candidateSubmitBtn.textContent = 'Add Candidate';
+        }
+
+        // Add/Edit Candidate Form Submission
+        candidateForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const candidateId = candidateIdInput.value;
+            const resumeFile = candidateResumeInput.files[0];
+
+            let resumeBlob = null;
+            if (resumeFile) {
+                try {
+                    // Read file as ArrayBuffer, then convert to Blob for IndexedDB storage
+                    const arrayBuffer = await resumeFile.arrayBuffer();
+                    resumeBlob = new Blob([arrayBuffer], { type: resumeFile.type });
+                    resumeBlob.name = resumeFile.name; // Add name property for easier retrieval
+                    resumeBlob.size = resumeFile.size; // Add size property
+                } catch (error) {
+                    console.error("Error reading resume file:", error);
+                    // Optionally, inform the user about the file error
+                }
+            } else if (candidateId) {
+                // If no new file is selected during edit, retain the old resume if it exists
+                const existingCandidate = await db.candidates.get(parseInt(candidateId));
+                if (existingCandidate && existingCandidate.resume) {
+                    resumeBlob = existingCandidate.resume;
+                }
+            }
+
+            const candidateData = {
+                name: document.getElementById('candidateName').value,
+                email: document.getElementById('candidateEmail').value,
+                phone: document.getElementById('candidatePhone').value,
+                notes: document.getElementById('candidateNotes').value,
+                resume: resumeBlob // Store the Blob
+            };
+
+            try {
+                if (candidateId) {
+                    // Update existing candidate
+                    await db.candidates.update(parseInt(candidateId), {
+                        ...candidateData,
+                        updated_at: new Date().toISOString()
+                    });
+                    console.log("Candidate updated:", candidateId);
+                } else {
+                    // Add new candidate
+                    await db.candidates.add({
+                        ...candidateData,
+                        created_at: new Date().toISOString()
+                    });
+                    console.log("New candidate added.");
+                }
+                await renderCandidates(); // Re-render the list
+                resetCandidateForm(); // Reset form after submission
+                await populateApplicationForms(); // Update candidate dropdown in application form
+            } catch (error) {
+                console.error("Error submitting candidate form:", error);
+            }
+        });
+
+        // --- Application Management Functions ---
+
+        /**
+         * Populates the candidate and job dropdowns in the application form from IndexedDB.
+         */
+        async function populateApplicationForms() {
+            try {
+                const candidates = await db.candidates.toArray();
+                const jobs = await db.jobs.toArray();
+
+                // Clear existing options
+                appCandidateSelect.innerHTML = '<option value="">Select a Candidate</option>';
+                appJobSelect.innerHTML = '<option value="">Select a Job</option>';
+
+                // Populate candidates
+                candidates.forEach(candidate => {
+                    const option = document.createElement('option');
+                    option.value = candidate.id;
+                    option.textContent = candidate.name;
+                    appCandidateSelect.appendChild(option);
+                });
+
+                // Populate jobs
+                jobs.forEach(job => {
+                    const option = document.createElement('option');
+                    option.value = job.id;
+                    option.textContent = job.title;
+                    appJobSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error("Error populating application forms:", error);
+            }
+        }
+
+        /**
+         * Renders the list of applications from IndexedDB.
+         */
+        async function renderApplications() {
+            try {
+                const applications = await db.applications.toArray();
+                const candidates = await db.candidates.toArray();
+                const jobs = await db.jobs.toArray();
+
+                applicationListDiv.innerHTML = ''; // Clear existing list
+
+                if (applications.length === 0) {
+                    emptyApplicationsState.style.display = 'block';
+                } else {
+                    emptyApplicationsState.style.display = 'none';
+                    applications.forEach(app => {
+                        const candidate = candidates.find(c => c.id === app.candidate_id);
+                        const job = jobs.find(j => j.id === app.job_id);
+
+                        const applicationItem = document.createElement('div');
+                        applicationItem.className = 'item-row';
+                        applicationItem.innerHTML = `
+                            <div>
+                                <p class="text-lg font-semibold text-gray-800">
+                                    ${candidate ? candidate.name : 'Unknown Candidate'} applying for
+                                    ${job ? job.title : 'Unknown Job'}
+                                </p>
+                                <p class="text-sm text-gray-600">Current Stage: <span class="font-medium text-blue-600">${app.stage}</span></p>
+                                <p class="text-xs text-gray-500">Applied: ${new Date(app.applied_at).toLocaleDateString()}</p>
+                                ${app.notes ? `<p class="text-sm text-gray-600 mt-1">Notes: ${app.notes}</p>` : ''}
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <select class="select-field text-sm py-1 px-2" data-id="${app.id}" data-type="application-stage">
+                                    <option value="Applied" ${app.stage === 'Applied' ? 'selected' : ''}>Applied</option>
+                                    <option value="Screening" ${app.stage === 'Screening' ? 'selected' : ''}>Screening</option>
+                                    <option value="Interview Scheduled" ${app.stage === 'Interview Scheduled' ? 'selected' : ''}>Interview Scheduled</option>
+                                    <option value="Interviewed" ${app.stage === 'Interviewed' ? 'selected' : ''}>Interviewed</option>
+                                    <option value="Assessment" ${app.stage === 'Assessment' ? 'selected' : ''}>Assessment</option>
+                                    <option value="Reference Check" ${app.stage === 'Reference Check' ? 'selected' : ''}>Reference Check</option>
+                                    <option value="Offer Extended" ${app.stage === 'Offer Extended' ? 'selected' : ''}>Offer Extended</option>
+                                    <option value="Offer Accepted" ${app.stage === 'Offer Accepted' ? 'selected' : ''}>Offer Accepted</option>
+                                    <option value="Offer Rejected" ${app.stage === 'Offer Rejected' ? 'selected' : ''}>Offer Rejected</option>
+                                    <option value="Background Check" ${app.stage === 'Background Check' ? 'selected' : ''}>Background Check</option>
+                                    <option value="Onboarding" ${app.stage === 'Onboarding' ? 'selected' : ''}>Onboarding</option>
+                                    <option value="Hired" ${app.stage === 'Hired' ? 'selected' : ''}>Hired</option>
+                                    <option value="Rejected" ${app.stage === 'Rejected' ? 'selected' : ''}>Rejected</option>
+                                </select>
+                                ${app.stage === 'Offer Extended' || app.stage === 'Offer Accepted' || app.stage === 'Hired' ?
+                                `<button class="btn btn-secondary text-sm py-1 px-2" data-id="${app.id}" data-type="generate-offer">Offer Letter</button>` : ''}
+                                <button class="btn btn-edit" data-id="${app.id}" data-type="application-edit">Edit</button>
+                                <button class="btn btn-delete" data-id="${app.id}" data-type="application-delete">Delete</button>
+                            </div>
+                        `;
+                        applicationListDiv.appendChild(applicationItem);
+                    });
+                }
+            } catch (error) {
+                console.error("Error rendering applications:", error);
+            }
+        }
+
+        /**
+         * Resets the application form to "Create New" mode.
+         */
+        function resetApplicationForm() {
+            applicationIdInput.value = '';
+            applicationForm.reset();
+            applicationFormTitle.textContent = 'Create New Application';
+            applicationSubmitBtn.textContent = 'Create Application';
+            // Re-populate dropdowns to ensure they are fresh
+            populateApplicationForms();
+        }
+
+        // Create/Edit Application Form Submission
+        applicationForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const applicationId = applicationIdInput.value;
+            const candidateId = parseInt(document.getElementById('appCandidate').value);
+            const jobId = parseInt(document.getElementById('appJob').value);
+            const stage = document.getElementById('appStage').value;
+            const notes = document.getElementById('appNotes').value;
+
+            if (isNaN(candidateId) || isNaN(jobId)) {
+                console.error("Please select both a candidate and a job.");
+                return;
+            }
+
+            const applicationData = {
+                candidate_id: candidateId,
+                job_id: jobId,
+                stage: stage,
+                notes: notes,
+            };
+
+            try {
+                if (applicationId) {
+                    // Update existing application
+                    await db.applications.update(parseInt(applicationId), {
+                        ...applicationData,
+                        last_updated_stage: new Date().toISOString()
+                    });
+                    console.log("Application updated:", applicationId);
+                } else {
+                    // Add new application
+                    await db.applications.add({
+                        ...applicationData,
+                        applied_at: new Date().toISOString(),
+                        last_updated_stage: new Date().toISOString()
+                    });
+                    console.log("New application added.");
+                }
+                await renderApplications(); // Re-render the list
+                resetApplicationForm(); // Reset form after submission
+            } catch (error) {
+                console.error("Error submitting application form:", error);
+            }
+        });
+
+        // Update Application Stage (Event Delegation)
+        applicationListDiv.addEventListener('change', async function(event) {
+            if (event.target.dataset.type === 'application-stage') {
+                const appId = parseInt(event.target.dataset.id);
+                const newStage = event.target.value;
+                try {
+                    await db.applications.update(appId, {
+                        stage: newStage,
+                        last_updated_stage: new Date().toISOString()
+                    });
+                    console.log(`Application ${appId} stage updated to ${newStage}`);
+                    await renderApplications(); // Re-render to show updated stage
+                } catch (error) {
+                    console.error("Error updating application stage:", error);
+                }
+            }
+        });
+
+        // --- Global Edit/Delete/Offer Letter/Resume Download Handler (Event Delegation) ---
+        document.addEventListener('click', async function(event) {
+            const target = event.target;
+            const id = parseInt(target.dataset.id);
+            const type = target.dataset.type;
+
+            if (target.classList.contains('btn-edit')) {
+                try {
+                    if (type === 'job-edit') {
+                        const job = await db.jobs.get(id);
+                        if (job) {
+                            jobIdInput.value = job.id;
+                            document.getElementById('jobTitle').value = job.title;
+                            document.getElementById('jobDepartment').value = job.department;
+                            document.getElementById('jobDescription').value = job.description;
+                            document.getElementById('jobRequirements').value = job.requirements;
+                            jobFormTitle.textContent = 'Edit Job Vacancy';
+                            jobSubmitBtn.textContent = 'Update Job';
+                        }
+                    } else if (type === 'candidate-edit') {
+                        const candidate = await db.candidates.get(id);
+                        if (candidate) {
+                            candidateIdInput.value = candidate.id;
+                            document.getElementById('candidateName').value = candidate.name;
+                            document.getElementById('candidateEmail').value = candidate.email;
+                            document.getElementById('candidatePhone').value = candidate.phone;
+                            document.getElementById('candidateNotes').value = candidate.notes;
+                            // Note: File inputs cannot be programmatically set for security reasons.
+                            // The user will need to re-select the resume if they want to change it.
+                            candidateFormTitle.textContent = 'Edit Candidate';
+                            candidateSubmitBtn.textContent = 'Update Candidate';
+                        }
+                    } else if (type === 'application-edit') {
+                        const application = await db.applications.get(id);
+                        if (application) {
+                            applicationIdInput.value = application.id;
+                            // Ensure dropdowns are populated before setting values
+                            await populateApplicationForms();
+                            appCandidateSelect.value = application.candidate_id;
+                            appJobSelect.value = application.job_id;
+                            appStage.value = application.stage;
+                            document.getElementById('appNotes').value = application.notes;
+                            applicationFormTitle.textContent = 'Edit Application';
+                            applicationSubmitBtn.textContent = 'Update Application';
+                        }
+                    }
+                } catch (error) {
+                    console.error("Error fetching item for edit:", error);
+                }
+            } else if (target.classList.contains('btn-delete')) {
+                try {
+                    if (type === 'job-delete') {
+                        await db.jobs.delete(id);
+                        // Also delete any applications linked to this job
+                        const applicationsToDelete = await db.applications.where({ job_id: id }).toArray();
+                        for (const app of applicationsToDelete) {
+                            await db.applications.delete(app.id);
+                        }
+                        console.log(`Job ${id} and associated applications deleted.`);
+                        await renderJobs();
+                        await renderApplications();
+                        await populateApplicationForms();
+                    } else if (type === 'candidate-delete') {
+                        await db.candidates.delete(id);
+                        // Also delete any applications linked to this candidate
+                        const applicationsToDelete = await db.applications.where({ candidate_id: id }).toArray();
+                        for (const app of applicationsToDelete) {
+                            await db.applications.delete(app.id);
+                        }
+                        console.log(`Candidate ${id} and associated applications deleted.`);
+                        await renderCandidates();
+                        await renderApplications();
+                        await populateApplicationForms();
+                    } else if (type === 'application-delete') {
+                        await db.applications.delete(id);
+                        console.log(`Application ${id} deleted.`);
+                        await renderApplications();
+                    }
+                } catch (error) {
+                    console.error("Error deleting item:", error);
+                }
+            } else if (target.dataset.type === 'generate-offer') {
+                await openOfferLetterModal(id);
+            } else if (target.dataset.type === 'download-resume') {
+                await downloadResume(id);
+            }
+        });
+
+        // --- Excel/CSV Download Functionality ---
+
+        /**
+         * Converts an array of objects to a CSV string.
+         * @param {Array<Object>} data - The array of objects to convert.
+         * @param {Array<string>} headers - Optional array of header keys to include. If not provided, all keys from the first object are used.
+         * @returns {string} The CSV string.
+         */
+        function convertToCsv(data, headers) {
+            if (!data || data.length === 0) return '';
+
+            const keys = headers || Object.keys(data[0]);
+            const headerRow = keys.map(key => `"${key}"`).join(',');
+            const rows = data.map(row =>
+                keys.map(key => {
+                    let value = row[key];
+                    if (value === null || value === undefined) {
+                        value = '';
+                    } else if (typeof value === 'object' && value !== null) {
+                        // Handle special objects like Blobs (resume)
+                        if (value instanceof Blob && value.name) {
+                            value = `[File: ${value.name}, Type: ${value.type}]`;
+                        } else {
+                             // Stringify other objects to prevent [object Object]
+                            value = JSON.stringify(value);
+                        }
+                    } else {
+                        value = String(value);
+                    }
+                    // Escape double quotes by doubling them, then wrap in quotes
+                    return `"${value.replace(/"/g, '""')}"`;
+                }).join(',')
+            );
+            return [headerRow, ...rows].join('\n');
+        }
+
+        /**
+         * Triggers a file download in the browser.
+         * @param {string} filename - The name of the file to download.
+         * @param {string|Blob} content - The content of the file (string for text, Blob for binary).
+         * @param {string} mimeType - The MIME type of the file (e.g., 'text/csv', 'application/pdf').
+         */
+        function downloadFile(filename, content, mimeType) {
+            const element = document.createElement('a');
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            element.setAttribute('href', url);
+            element.setAttribute('download', filename);
+            element.style.display = 'none';
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+            URL.revokeObjectURL(url); // Clean up the URL object
+        }
+
+        // Event listener for "Download All Data (CSV)" button
+        downloadAllDataBtn.addEventListener('click', async () => {
+            try {
+                const jobs = await db.jobs.toArray();
+                const candidates = await db.candidates.toArray();
+                const applications = await db.applications.toArray();
+
+                // Define headers explicitly to control order and ensure all fields
+                const jobHeaders = ['id', 'title', 'department', 'description', 'requirements', 'status', 'created_at', 'updated_at'];
+                const candidateHeaders = ['id', 'name', 'email', 'phone', 'notes', 'resume', 'created_at', 'updated_at'];
+                const applicationHeaders = ['id', 'candidate_id', 'job_id', 'stage', 'notes', 'applied_at', 'last_updated_stage'];
+
+                downloadFile('jobs_data.csv', convertToCsv(jobs, jobHeaders), 'text/csv');
+                downloadFile('candidates_data.csv', convertToCsv(candidates, candidateHeaders), 'text/csv');
+                downloadFile('applications_data.csv', convertToCsv(applications, applicationHeaders), 'text/csv');
+
+                console.log("All data exported to CSV files.");
+            } catch (error) {
+                console.error("Error exporting data to CSV:", error);
+            }
+        });
+
+        // --- Offer Letter Generation Functionality ---
+
+        /**
+         * Opens the offer letter modal and pre-fills data.
+         * @param {number} appId - The ID of the application for which to generate the offer letter.
+         */
+        async function openOfferLetterModal(appId) {
+            try {
+                const application = await db.applications.get(appId);
+                if (!application) {
+                    console.error("Application not found for offer letter generation.");
+                    return;
+                }
+                const candidate = await db.candidates.get(application.candidate_id);
+                const job = await db.jobs.get(application.job_id);
+
+                if (!candidate || !job) {
+                    console.error("Associated candidate or job not found for application.");
+                    return;
+                }
+
+                offerAppIdInput.value = appId;
+                offerCompanyNameInput.value = 'SALMAN GROUP'; // Default from provided document
+                offerCandidateNameInput.value = candidate.name;
+                offerJobTitleInput.value = job.title;
+                offerReportingManagerInput.value = 'Showroom Manager/Sales Manager'; // Default from provided document
+                offerSalaryInput.value = ''; // Clear previous input
+                offerPayrollScheduleInput.value = 'monthly basis, less required deductions (Through direct deposit)'; // Default
+                offerBenefitsInput.value = 'You shall be entitled to participate in all benefit plans of SALMAN GROUP. as may be made available to employees of SALMAN GROUP. from time to time for which you are eligible. You will receive complete details of all benefits plans as part of your new employee orientation, and enrolment will take place (immediately) OR (Once you meet the eligibility criteria).'; // Default from provided document
+                offerTravelPolicyInput.value = 'Required to visit Head Office, Other Stores of SALMAN GROUP, Banks, etc. as per the company travel policy.'; // Default from provided document
+                offerProbationPeriodInput.value = '6'; // Default from provided document
+                offerMinEmploymentPeriodInput.value = '24'; // Default from provided document
+                offerResignationNoticeInput.value = '60'; // Default from provided document
+                offerTerminationNoticeInput.value = '30'; // Default from provided document
+                offerStartDateInput.value = ''; // Clear previous input
+                offerExpiryDateInput.value = ''; // Clear previous input
+                offerDetailsInput.value = ''; // Clear previous input
+
+                offerLetterModal.classList.remove('hidden');
+            } catch (error) {
+                console.error("Error opening offer letter modal:", error);
+            }
+        }
+
+        // Close offer letter modal
+        closeOfferLetterModal.addEventListener('click', () => {
+            offerLetterModal.classList.add('hidden');
+            offerLetterForm.reset(); // Reset form when closing
+        });
+
+        // Generate Offer Letter Form Submission
+        offerLetterForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const appId = parseInt(offerAppIdInput.value);
+            const companyName = offerCompanyNameInput.value; // New
+            const candidateName = offerCandidateNameInput.value;
+            const jobTitle = offerJobTitleInput.value;
+            const reportingManager = offerReportingManagerInput.value; // New
+            const salary = offerSalaryInput.value;
+            const payrollSchedule = offerPayrollScheduleInput.value; // New
+            const benefits = offerBenefitsInput.value; // New
+            const travelPolicy = offerTravelPolicyInput.value; // New
+            const probationPeriod = offerProbationPeriodInput.value; // New
+            const minEmploymentPeriod = offerMinEmploymentPeriodInput.value; // New
+            const resignationNotice = offerResignationNoticeInput.value; // New
+            const terminationNotice = offerTerminationNoticeInput.value; // New
+            const startDate = offerStartDateInput.value;
+            const expiryDate = offerExpiryDateInput.value;
+            const additionalDetails = offerDetailsInput.value;
+
+            const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+            const offerLetterContent = `
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Job Offer - ${candidateName}</title>
+                    <style>
+                        body { font-family: 'Inter', sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 20px auto; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
+                        h1 { color: #3b82f6; text-align: center; margin-bottom: 20px; }
+                        p { margin-bottom: 10px; }
+                        .signature { margin-top: 40px; border-top: 1px solid #ccc; padding-top: 10px; }
+                        .details-section { background-color: #f9f9f9; padding: 15px; border-radius: 8px; margin-top: 20px; }
+                        .details-section strong { color: #2563eb; }
+                        .footer { margin-top: 30px; font-size: 0.9em; text-align: center; color: #666; }
+                        .section-title { font-weight: bold; margin-top: 15px; margin-bottom: 5px; color: #333; }
+                    </style>
+                </head>
+                <body>
+                    <h1>Offer of Employment</h1>
+                    <p><strong>Date:</strong> ${today}</p>
+                    <p>Dear ${candidateName},</p>
+                    <p>We are pleased to confirm our offer of employment to you for a regular full-time position with <strong>${companyName}</strong> as <strong>${jobTitle}</strong>.</p>
+
+                    <div class="details-section">
+                        <p class="section-title">Position Details:</p>
+                        <p><strong>Position:</strong> ${jobTitle}</p>
+                        <p><strong>Initial Reporting Relationship:</strong> ${reportingManager}</p>
+                        <p><strong>Status:</strong> Full-time</p>
+                        <p><strong>Annual Salary:</strong> $${parseInt(salary).toLocaleString()} (USD)</p>
+                        <p><strong>Payroll Schedule:</strong> ${payrollSchedule}</p>
+                        ${benefits ? `<p><strong>Benefits:</strong> ${benefits.replace(/\n/g, '<br>')}</p>` : ''}
+                        ${travelPolicy ? `<p><strong>Travel:</strong> ${travelPolicy.replace(/\n/g, '<br>')}</p>` : ''}
+                        ${probationPeriod ? `<p><strong>Probationary Period:</strong> The first ${probationPeriod} months of your employment will constitute a probationary period.</p>` : ''}
+                        ${minEmploymentPeriod ? `<p><strong>Minimum Employment Commitment:</strong> Your minimum employment period commitment with ${companyName} will be of ${minEmploymentPeriod} months from the date of joining.</p>` : ''}
+                        ${resignationNotice ? `<p><strong>Resignation Notice:</strong> If you wish to resign your employment, you will be required to provide ${resignationNotice} days' written notice.</p>` : ''}
+                        ${terminationNotice ? `<p><strong>Termination Notice:</strong> Your service may be terminated with ${terminationNotice} days' notice period from either side or basic salary in lieu thereof.</p>` : ''}
+                        <p><strong>Start Date:</strong> ${new Date(startDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric'})}</p>
+                        <p><strong>Offer Expiry:</strong> This offer is valid until ${new Date(expiryDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric'})}. Please notify us of your decision by this date.</p>
+                        ${additionalDetails ? `<p><strong>Additional Details:</strong> ${additionalDetails.replace(/\n/g, '<br>')}</p>` : ''}
+                    </div>
+
+                    <p>This offer is contingent upon successful completion of a background check and verification of your eligibility to work in [Country/Region].</p>
+                    <p>We are excited about the prospect of you joining our team and look forward to your positive response.</p>
+
+                    <p class="signature">Sincerely,</p>
+                    <p>[Your Name/Hiring Manager Name]</p>
+                    <p>[Your Title]</p>
+                    <p>${companyName}</p>
+
+                    <div class="footer">
+                        <p>If you have any questions, please do not hesitate to contact us at [Your Contact Email/Phone].</p>
+                    </div>
+                </body>
+                </html>
+            `;
+
+            // Download the HTML file
+            downloadFile(`Offer_Letter_${candidateName.replace(/\s/g, '_')}.html`, offerLetterContent, 'text/html');
+
+            // Optionally, update application stage to "Offer Extended" if it's not already
+            const application = await db.applications.get(appId);
+            if (application && application.stage !== 'Offer Extended' && application.stage !== 'Offer Accepted' && application.stage !== 'Hired') {
+                await db.applications.update(appId, {
+                    stage: 'Offer Extended',
+                    last_updated_stage: new Date().toISOString()
+                });
+                await renderApplications(); // Re-render to show updated stage
+            }
+
+            offerLetterModal.classList.add('hidden'); // Close modal after generation
+            offerLetterForm.reset(); // Reset form
+        });
+
+        // --- Resume Download Functionality ---
+        /**
+         * Downloads the resume associated with a candidate.
+         * @param {number} candidateId - The ID of the candidate whose resume to download.
+         */
+        async function downloadResume(candidateId) {
+            try {
+                const candidate = await db.candidates.get(candidateId);
+                if (candidate && candidate.resume && candidate.resume instanceof Blob) {
+                    const resumeBlob = candidate.resume;
+                    const filename = resumeBlob.name || `resume_${candidate.name.replace(/\s/g, '_')}.${resumeBlob.type.split('/')[1] || 'bin'}`;
+                    downloadFile(filename, resumeBlob, resumeBlob.type);
+                    console.log(`Resume for ${candidate.name} downloaded.`);
+                } else {
+                    console.warn(`No resume found or invalid resume data for candidate ID: ${candidateId}`);
+                }
+            } catch (error) {
+                console.error("Error downloading resume:", error);
+            }
+        }
+
+
+        // --- Initial Load ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Activate the default tab (Jobs)
+            document.querySelector('.tab-button[data-tab="jobs"]').click();
+            // Populate forms and render lists on initial load
+            await populateApplicationForms();
+            await renderJobs();
+            await renderCandidates();
+            await renderApplications();
+        });
+    </script>
+</body>
+</html>
